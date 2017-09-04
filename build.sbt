@@ -1,4 +1,5 @@
 import sbtrelease.Version
+import com.typesafe.sbt.pgp.PgpKeys.publishSigned
 
 lazy val contributors = Seq(
   "pchiusano" -> "Paul Chiusano",
@@ -13,7 +14,7 @@ lazy val contributors = Seq(
   "guersam" -> "Jisoo Park"
 )
 
-val catsVersion = "0.7.2"
+val catsVersion = "1.0.0-MF"
 
 def scmBranch(v: String): String = {
   val Some(ver) = Version(v)
@@ -23,8 +24,8 @@ def scmBranch(v: String): String = {
 lazy val commonSettings = Seq(
   name := "fs2-cats",
   organization := "co.fs2",
-  scalaVersion := "2.11.8",
-  crossScalaVersions := Seq("2.11.8"), // NB: No cats build for 2.12.0 yet
+  scalaVersion := "2.11.11",
+  crossScalaVersions := Seq("2.11.11", "2.12.3"),
   scalacOptions ++= Seq(
     "-feature",
     "-deprecation",
@@ -38,11 +39,12 @@ lazy val commonSettings = Seq(
     "-Ywarn-unused-import"
   ),
   scalacOptions in (Compile, console) ~= {_.filterNot("-Ywarn-unused-import" == _)},
-  scalacOptions in (Test, console) <<= (scalacOptions in (Compile, console)),
+  scalacOptions in (Test, console) := (scalacOptions in (Compile, console)).value,
   libraryDependencies ++= Seq(
-    "co.fs2" %%% "fs2-core" % "0.9.0",
+    "co.fs2" %%% "fs2-core" % "0.9.2",
     "org.typelevel" %%% "cats-core" % catsVersion,
-    "org.typelevel" %%% "cats-laws" % catsVersion % "test"
+    "org.typelevel" %%% "cats-laws" % catsVersion % "test",
+    "org.typelevel" %%% "cats-effect" % "0.4"
   ),
   scmInfo := Some(ScmInfo(url("https://github.com/functional-streams-for-scala/fs2-cats"), "git@github.com:functional-streams-for-scala/fs2-cats.git")),
   homepage := Some(url("https://github.com/functional-streams-for-scala/fs2")),
@@ -54,7 +56,7 @@ lazy val commonSettings = Seq(
     import cats.implicits._
   """,
   resolvers += "Sonatype Public" at "https://oss.sonatype.org/content/groups/public/",
-  addCompilerPlugin("org.spire-math" % "kind-projector" % "0.7.1" cross CrossVersion.binary)
+  addCompilerPlugin("org.spire-math" % "kind-projector" % "0.9.3" cross CrossVersion.binary)
 ) ++ testSettings ++ scaladocSettings ++ publishingSettings ++ releaseSettings
 
 lazy val testSettings = Seq(
@@ -121,13 +123,25 @@ lazy val releaseSettings = Seq(
 lazy val commonJsSettings = Seq(
   requiresDOM := false,
   scalaJSStage in Test := FastOptStage,
-  jsEnv in Test := NodeJSEnv().value,
+  jsEnv in Test := new org.scalajs.jsenv.nodejs.NodeJSEnv(),
   scalacOptions in Compile += {
     val dir = project.base.toURI.toString.replaceFirst("[^/]+/?$", "")
     val url = s"https://raw.githubusercontent.com/functional-streams-for-scala/fs2-cats"
     s"-P:scalajs:mapSourceURI:$dir->$url/${scmBranch(version.value)}/"
   }
 )
+
+lazy val noPublish = Seq(
+  publish := (),
+  publishLocal := (),
+  publishSigned := (),
+  publishArtifact := false
+)
+
+lazy val root = project.in(file(".")).
+  settings(commonSettings).
+  settings(noPublish).
+  aggregate(fs2CatsJVM, fs2CatsJS)
 
 lazy val fs2Cats = crossProject.in(file(".")).
   settings(commonSettings: _*).
